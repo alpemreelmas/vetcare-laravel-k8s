@@ -1,0 +1,17 @@
+apiVersion: batch/v1
+kind: Job
+metadata:
+  name: laravel-seed
+spec:
+  template:
+    spec:
+      containers:
+        - name: seed
+          image: aelmas0/vetcare-laravel-cdv:latest
+          command: ["php", "artisan", "db:seed", "--force"]
+          envFrom:
+            - configMapRef:
+                name: laravel-config
+            - secretRef:
+                name: laravel-secret
+      restartPolicy: Never

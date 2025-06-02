@@ -1,0 +1,17 @@
+apiVersion: batch/v1
+kind: Job
+metadata:
+  name: laravel-migrate
+spec:
+  template:
+    spec:
+      containers:
+        - name: migrate
+          image: aelmas0/vetcare-laravel-cdv:latest
+          command: ["php", "artisan", "migrate", "--force"]
+          envFrom:
+            - configMapRef:
+                name: laravel-config
+            - secretRef:
+                name: laravel-secret
+      restartPolicy: Never
