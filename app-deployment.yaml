@@ -3,7 +3,7 @@ kind: Deployment
 metadata:
   name: laravel-app
 spec:
-  replicas: 1
+  replicas: 3
   selector:
     matchLabels:
       app: laravel-app
@@ -13,12 +13,17 @@ spec:
         app: laravel-app
     spec:
       containers:
-        - name: laravel
-          image: aelmas0/vetcare-laravel-cdv:latest
-          ports:
-            - containerPort: 8000
-          envFrom:
-            - configMapRef:
-                name: laravel-config
-            - secretRef:
-                name: laravel-secret
+      - name: laravel
+        image: aelmas0/vetcare-laravel-cdv:latest
+        ports:
+          - containerPort: 8000
+        envFrom:
+          - configMapRef:
+              name: laravel-config
+          - secretRef:
+              name: laravel-secret
+        resources:
+          requests:
+            cpu: 100m
+          limits:
+            cpu: 500m
