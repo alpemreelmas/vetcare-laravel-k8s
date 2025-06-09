@@ -1,0 +1,41 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: fe-app
+spec:
+  replicas: 2
+  selector:
+    matchLabels:
+      app: fe-app
+  template:
+    metadata:
+      labels:
+        app: fe-app
+    spec:
+      containers:
+      - name: fe
+        image: aelmas0/vetcare-frontend:latest
+        ports:
+          - containerPort: 8080
+        env:
+          - name: API_BASE_URL
+            value: "http://laravel-service:80"
+        livenessProbe:
+          httpGet:
+            path: /
+            port: 8080
+          initialDelaySeconds: 30
+          periodSeconds: 10
+        readinessProbe:
+          httpGet:
+            path: /
+            port: 8080
+          initialDelaySeconds: 5
+          periodSeconds: 5
+        resources:
+          requests:
+            cpu: 100m
+            memory: 128Mi
+          limits:
+            cpu: 500m
+            memory: 512Mi
