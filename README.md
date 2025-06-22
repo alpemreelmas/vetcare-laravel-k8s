@@ -7,8 +7,8 @@ This Kubernetes setup deploys a **Laravel VetCare application** with the followi
 ```
 ┌─────────────────┐    ┌──────────────────┐    ┌─────────────────┐
 │                 │    │                  │    │                 │
-│   Ingress       │───▶│  Laravel App     │───▶│   PostgreSQL    │
-│ (vetcare.local) │    │   (Port 8000)    │    │   (Port 5432)   │
+│ Port Forward/   │───▶│  Laravel App     │───▶│   PostgreSQL    │
+│ NodePort Access │    │   (Port 8000)    │    │   (Port 5432)   │
 │                 │    │                  │    │                 │
 └─────────────────┘    └──────────────────┘    └─────────────────┘
 ```
@@ -17,9 +17,9 @@ This Kubernetes setup deploys a **Laravel VetCare application** with the followi
 
 | Component | Description | Replicas | Image |
 |-----------|-------------|----------|-------|
-| **Laravel App** | Main web application | 1-5 (HPA) | `aelmas0/vetcare-laravel-cdv:latest` |
+| **Laravel App** | Main web application | 3 | `aelmas0/vetcare-laravel-cdv:latest` |
+| **Frontend App** | React/Vue frontend | 2 | `aelmas0/vetcare-frontend:latest` |
 | **PostgreSQL** | Database server | 1 | `postgres:15` |
-| **NGINX Ingress** | Load balancer/Router | 1 | Official NGINX Ingress |
 
 ---
 
@@ -29,12 +29,13 @@ This Kubernetes setup deploys a **Laravel VetCare application** with the followi
 k8s/
 ├── app-deployment.yaml     # Laravel application deployment
 ├── app.service.yaml        # Laravel service (ClusterIP)
+├── fe-deployment.yaml      # Frontend application deployment  
+├── fe-service.yaml         # Frontend service (ClusterIP)
 ├── configmap.yaml          # Application configuration
 ├── secret.yaml            # Database credentials
 ├── db-deployment.yaml     # PostgreSQL deployment
 ├── db-service.yaml        # PostgreSQL service
 ├── db-pvc.yaml           # Database persistent storage
-├── ingress.yaml          # Ingress routing rules
 ├── migrate-job.yaml      # Database migration job
 └── seed-job.yaml         # Database seeding job
 ```
@@ -56,7 +57,8 @@ kubectl apply -f db-deployment.yaml
 kubectl apply -f db-service.yaml
 kubectl apply -f app-deployment.yaml
 kubectl apply -f app.service.yaml
-kubectl apply -f ingress.yaml
+kubectl apply -f fe-deployment.yaml
+kubectl apply -f fe-service.yaml
 ```
 
 ### Run Database Setup
@@ -82,9 +84,6 @@ kubectl get pods
 
 # Check services
 kubectl get svc
-
-# Check ingress
-kubectl get ingress
 ```
 
 ### Detailed Information
@@ -194,16 +193,15 @@ kubectl exec <POSTGRES_POD_NAME> -- pg_dump -U laravel vetcare > backup.sql
 
 ## 🌐 Accessing the Application
 
-### Method 1: Using Minikube Tunnel (Recommended)
+### Method 1: Port Forwarding (Recommended for Development)
 ```bash
-# Start tunnel (run in separate terminal)
-minikube tunnel
+# Forward Laravel backend service
+kubectl port-forward svc/laravel-service 8080:80
+# Access backend API: http://localhost:8080/api
 
-# Add to /etc/hosts (or C:\Windows\System32\drivers\etc\hosts)
-127.0.0.1 vetcare.local
-
-# Access application
-http://vetcare.local
+# Forward Frontend service (in another terminal)
+kubectl port-forward svc/fe-service 3000:80
+# Access frontend: http://localhost:3000
 ```
 
 ### Method 2: NodePort Access
@@ -211,18 +209,24 @@ http://vetcare.local
 # Get Minikube IP
 minikube ip
 
-# Get ingress controller NodePort
-kubectl get svc -n ingress-nginx ingress-nginx-controller
+# Convert services to NodePort type for external access
+kubectl patch svc laravel-service -p '{"spec":{"type":"NodePort"}}'
+kubectl patch svc fe-service -p '{"spec":{"type":"NodePort"}}'
+
+# Get assigned NodePorts
+kubectl get svc
 
 # Access via: http://<MINIKUBE_IP>:<NODEPORT>
 ```
 
-### Method 3: Port Forwarding
+### Method 3: LoadBalancer (Cloud Environments)
 ```bash
-# Forward Laravel service port
-kubectl port-forward svc/laravel-service 8080:80
+# Convert to LoadBalancer type if supported
+kubectl patch svc laravel-service -p '{"spec":{"type":"LoadBalancer"}}'
+kubectl patch svc fe-service -p '{"spec":{"type":"LoadBalancer"}}'
 
-# Access via: http://localhost:8080
+# Get external IP
+kubectl get svc
 ```
 
 ---
@@ -249,8 +253,9 @@ kubectl run debug --image=busybox -it --rm -- nslookup laravel-service
 # Check endpoints
 kubectl get endpoints
 
-# Test ingress
-kubectl describe ingress laravel-ingress
+# Test service ports
+kubectl port-forward svc/laravel-service 8080:80
+curl http://localhost:8080/api/health
 ```
 
 ### Resource Issues
@@ -374,8 +379,8 @@ kubectl cluster-info
 # Check node resources
 kubectl describe nodes
 
-# Check ingress controller
-kubectl get pods -n ingress-nginx
+# Check all services
+kubectl get svc --all-namespaces
 ```
 
 ---
@@ -406,33 +411,17 @@ kubectl logs -l app=postgres -f
 kubectl exec -it deployment/postgres -- psql -U postgres
 ```
 
-### Ingress Issues
+### Service Issues
 ```bash
-# Restart ingress controller
-kubectl rollout restart deployment/ingress-nginx-controller -n ingress-nginx
+# Check service configuration
+kubectl describe svc laravel-service
+kubectl describe svc fe-service
 
-# Check ingress logs
-kubectl logs -n ingress-nginx deployment/ingress-nginx-controller
+# Test external access
+kubectl port-forward svc/laravel-service 8080:80
+kubectl port-forward svc/fe-service 3000:80
+
+# Check service logs
+kubectl logs -l app=laravel-app
+kubectl logs -l app=fe-app
 ```
-
----
-
-## 📚 Additional Resources
-
-- [Kubernetes Documentation](https://kubernetes.io/docs/)
-- [Laravel Documentation](https://laravel.com/docs)
-- [NGINX Ingress Controller](https://kubernetes.github.io/ingress-nginx/)
-- [PostgreSQL on Kubernetes](https://www.postgresql.org/docs/)
-
----
-
-## 🔒 Security Notes
-
-- Database credentials are stored in Kubernetes Secrets
-- Use proper RBAC for production environments
-- Consider using cert-manager for HTTPS certificates
-- Regularly update container images for security patches
-
----
-
-*Last updated: $(date)* 
