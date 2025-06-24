@@ -1,5 +1,8 @@
 # VetCare Laravel Application - Kubernetes Documentation
 
+## Intro
+You can find our intro video from [here!](https://www.youtube.com/watch?v=52plh06qZus)
+
 ## 🏗️ Architecture Overview
 
 This Kubernetes setup deploys a **Laravel VetCare application** with the following components:
